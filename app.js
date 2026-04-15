@@ -27,6 +27,9 @@
     treated: false,
     interlocked: false,
     storageLevel: 0,    // 0-100 %
+    storageUntreated: 0, // volume of untreated water in storage (0-100 scale)
+    storageContaminated: false,
+    flushingStorage: false,
     // Treatment process phases
     phase: 'IDLE',      // IDLE | FILLING | CHLORINATING | BOILING | TREATED | COOLING | DISPENSING
     chlorineStartTime: null,   // timestamp when chlorine pumping started
@@ -92,6 +95,13 @@
     // Storage
     storageWater: $('storage-water'),
     storageLabel: $('storage-label'),
+    storageTank:  $('storage-tank'),
+    storageStatus:$('storage-status'),
+    btnFlush:     $('btn-flush-storage'),
+    contaminationAlert: $('contamination-alert'),
+    ledContaminated: $('led-contaminated'),
+    // Gauge
+    gaugeFill:    $('gauge-fill'),
     // Manual overrides
     btnChlorine:  $('btn-chlorine'),
     btnBoil:      $('btn-boil'),
@@ -140,8 +150,15 @@
 
   dom.btnGate.addEventListener('click', () => {
     if (state.interlocked) return;
-    if (!state.treated) return; // water must be treated
+    if (state.level <= 0) return;
     state.manualGate = !state.manualGate;
+  });
+
+  // Flush storage button
+  dom.btnFlush.addEventListener('click', () => {
+    if (state.interlocked) return;
+    if (state.storageLevel <= 0) return;
+    state.flushingStorage = true;
   });
 
   // ── Core simulation tick ───────────────────────────────────
@@ -232,17 +249,42 @@
   function gateLoop() {
     // Gate opens when water is treated AND cooled below 50°C, or manual override
     const autoOpen = state.treated && state.temp < TEMP_GATE_OPEN;
-    state.gateOpen = autoOpen || (state.manualGate && state.treated);
+    state.gateOpen = autoOpen || state.manualGate;
 
     // Transfer water from process tank to storage while gate is open
     if (state.gateOpen && state.level > 0 && state.storageLevel < 100) {
-      state.storageLevel = Math.min(100, state.storageLevel + STORAGE_STEP);
+      const addedVolume = STORAGE_STEP;
+      // Track untreated water entering storage (manual gate with incomplete treatment)
+      if (!state.chlorineComplete || !state.boilingComplete) {
+        state.storageUntreated += addedVolume;
+      }
+      state.storageLevel = Math.min(100, state.storageLevel + addedVolume);
       state.level = Math.max(0, state.level - DRAIN_STEP);
     }
 
     // Close gate when tank is empty
     if (state.level <= 0) {
       state.manualGate = false;
+    }
+
+    // Flush storage (drain)
+    if (state.flushingStorage && state.storageLevel > 0) {
+      const drainAmount = Math.min(DRAIN_STEP, state.storageLevel);
+      const ratio = state.storageLevel > 0 ? state.storageUntreated / state.storageLevel : 0;
+      state.storageLevel = Math.max(0, state.storageLevel - drainAmount);
+      state.storageUntreated = state.storageLevel * ratio;
+    }
+    if (state.storageLevel <= 0) {
+      state.flushingStorage = false;
+      state.storageUntreated = 0;
+      state.storageContaminated = false;
+    }
+
+    // Contamination check: if >=5% of storage is untreated water
+    if (state.storageLevel > 0) {
+      state.storageContaminated = (state.storageUntreated / state.storageLevel) >= 0.05;
+    } else {
+      state.storageContaminated = false;
     }
   }
 
@@ -292,6 +334,9 @@
     state.treated = false;
     state.interlocked = false;
     state.storageLevel = 0;
+    state.storageUntreated = 0;
+    state.storageContaminated = false;
+    state.flushingStorage = false;
     state.phase = 'IDLE';
     state.chlorineStartTime = null;
     state.boilingStartTime = null;
@@ -303,7 +348,7 @@
 
   // ── Render ─────────────────────────────────────────────────
   function render() {
-    const { level, temp, fanOn, fanMode, gateOpen, treated, interlocked, storageLevel, phase } = state;
+    const { level, temp, fanOn, fanMode, gateOpen, treated, interlocked, storageLevel, phase, storageContaminated } = state;
 
     // Clock
     dom.clock.textContent = new Date().toLocaleTimeString();
@@ -334,6 +379,7 @@
     setLed(dom.ledFan,       fanOn, 'on-green');
     setLed(dom.ledGate,      gateOpen, 'on-green');
     setLed(dom.ledTreated,   treated, 'on-blue');
+    setLed(dom.ledContaminated, storageContaminated, 'on-red');
 
     // Readouts
     dom.valLevel.textContent = Math.round(level) + ' %';
@@ -408,6 +454,24 @@
     // Storage
     dom.storageWater.style.width = storageLevel + '%';
     dom.storageLabel.textContent = Math.round(storageLevel) + ' %';
+    dom.storageTank.classList.toggle('contaminated', storageContaminated);
+    dom.storageWater.classList.toggle('contaminated', storageContaminated);
+    dom.contaminationAlert.classList.toggle('hidden', !storageContaminated);
+    dom.btnFlush.disabled = interlocked || storageLevel <= 0;
+
+    // Temperature gauge
+    const gaugeMax = TEMP_CRITICAL; // 500°C = full gauge
+    const gaugeRatio = Math.min(temp / gaugeMax, 1);
+    const arcLength = 157; // approximate arc length of the semicircle
+    const dashOffset = arcLength * (1 - gaugeRatio);
+    dom.gaugeFill.style.strokeDashoffset = dashOffset;
+    if (temp >= TEMP_CRITICAL) {
+      dom.gaugeFill.style.stroke = 'var(--red)';
+    } else if (temp >= 200) {
+      dom.gaugeFill.style.stroke = 'var(--yellow)';
+    } else {
+      dom.gaugeFill.style.stroke = 'var(--green)';
+    }
 
     // Disable controls during interlock (except reset)
     dom.btnFill.disabled = interlocked;
@@ -419,7 +483,7 @@
     // Manual override buttons
     dom.btnChlorine.disabled = interlocked || !!state.chlorineStartTime || state.chlorineComplete || treated || level <= 0;
     dom.btnBoil.disabled = interlocked || !state.chlorineComplete || !!state.boilingStartTime || state.boilingComplete || treated;
-    dom.btnGate.disabled = interlocked || !treated;
+    dom.btnGate.disabled = interlocked || level <= 0;
 
     dom.btnChlorine.classList.toggle('active', phase === 'CHLORINATING');
     dom.btnBoil.classList.toggle('active', phase === 'BOILING');
