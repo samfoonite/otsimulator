@@ -72,6 +72,10 @@
           <div class="led" id="led-treated"></div>
           <span>Water Treated</span>
         </div>
+        <div class="indicator">
+          <div class="led" id="led-contaminated"></div>
+          <span>Storage Contaminated</span>
+        </div>
       </div>
 
       <div class="readouts">
@@ -79,8 +83,17 @@
           <span class="readout-label">Tank Level</span>
           <span class="readout-value" id="val-level">0 %</span>
         </div>
-        <div class="readout">
+        <div class="readout readout-temp">
           <span class="readout-label">Temperature</span>
+          <div class="temp-gauge-wrapper">
+            <svg class="temp-gauge" viewBox="0 0 120 70" xmlns="http://www.w3.org/2000/svg">
+              <path class="gauge-bg" d="M10,65 A50,50 0 0,1 110,65" fill="none" stroke="#333" stroke-width="8" stroke-linecap="round"/>
+              <path class="gauge-fill" id="gauge-fill" d="M10,65 A50,50 0 0,1 110,65" fill="none" stroke="var(--green)" stroke-width="8" stroke-linecap="round" stroke-dasharray="157" stroke-dashoffset="157"/>
+              <text x="60" y="58" text-anchor="middle" fill="#555" font-size="7" font-family="monospace">0</text>
+              <text x="14" y="62" text-anchor="middle" fill="#555" font-size="6" font-family="monospace">0</text>
+              <text x="106" y="62" text-anchor="middle" fill="#555" font-size="6" font-family="monospace">500</text>
+            </svg>
+          </div>
           <span class="readout-value" id="val-temp">0 &deg;C</span>
         </div>
         <div class="readout">
@@ -154,6 +167,14 @@
         <div class="storage-tank" id="storage-tank">
           <div class="storage-water" id="storage-water"></div>
           <span class="storage-label" id="storage-label">0 %</span>
+        </div>
+        <div class="storage-status" id="storage-status"></div>
+        <div class="storage-controls">
+          <button class="btn btn-danger" id="btn-flush-storage">Flush Storage</button>
+        </div>
+        <!-- Contamination alert banner -->
+        <div class="contamination-alert hidden" id="contamination-alert">
+          CONTAMINATED &mdash; FLUSH REQUIRED
         </div>
       </fieldset>
     </section>
