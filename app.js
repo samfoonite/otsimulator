@@ -33,6 +33,7 @@
     boilingStartTime: null,    // timestamp when boiling started
     chlorineComplete: false,
     boilingComplete: false,
+    manualGate: false,       // manual gate override
   };
 
   const TICK_MS = 200;           // simulation tick
@@ -91,6 +92,11 @@
     // Storage
     storageWater: $('storage-water'),
     storageLabel: $('storage-label'),
+    // Manual overrides
+    btnChlorine:  $('btn-chlorine'),
+    btnBoil:      $('btn-boil'),
+    btnGate:      $('btn-gate'),
+    manualStatus: $('manual-status'),
   };
 
   // ── Button listeners ───────────────────────────────────────
@@ -114,6 +120,28 @@
       if (state.interlocked) return;
       state.fanMode = btn.dataset.mode;
     });
+  });
+
+  // Manual override buttons
+  dom.btnChlorine.addEventListener('click', () => {
+    if (state.interlocked) return;
+    if (state.chlorineStartTime || state.chlorineComplete || state.treated) return;
+    if (state.level <= 0) return;
+    state.chlorineStartTime = Date.now();
+    state.filling = false;
+  });
+
+  dom.btnBoil.addEventListener('click', () => {
+    if (state.interlocked) return;
+    if (!state.chlorineComplete) return; // chlorine must finish first
+    if (state.boilingStartTime || state.boilingComplete || state.treated) return;
+    state.boilingStartTime = Date.now();
+  });
+
+  dom.btnGate.addEventListener('click', () => {
+    if (state.interlocked) return;
+    if (!state.treated) return; // water must be treated
+    state.manualGate = !state.manualGate;
   });
 
   // ── Core simulation tick ───────────────────────────────────
@@ -202,13 +230,19 @@
 
   // ── Gate Logic ─────────────────────────────────────────────
   function gateLoop() {
-    // Gate opens only when water is treated AND cooled below 50°C
-    const shouldOpen = state.treated && state.temp < TEMP_GATE_OPEN;
-    state.gateOpen = shouldOpen;
+    // Gate opens when water is treated AND cooled below 50°C, or manual override
+    const autoOpen = state.treated && state.temp < TEMP_GATE_OPEN;
+    state.gateOpen = autoOpen || (state.manualGate && state.treated);
 
-    // Fill storage while gate is open
-    if (state.gateOpen && state.storageLevel < 100) {
+    // Transfer water from process tank to storage while gate is open
+    if (state.gateOpen && state.level > 0 && state.storageLevel < 100) {
       state.storageLevel = Math.min(100, state.storageLevel + STORAGE_STEP);
+      state.level = Math.max(0, state.level - DRAIN_STEP);
+    }
+
+    // Close gate when tank is empty
+    if (state.level <= 0) {
+      state.manualGate = false;
     }
   }
 
@@ -263,6 +297,7 @@
     state.boilingStartTime = null;
     state.chlorineComplete = false;
     state.boilingComplete = false;
+    state.manualGate = false;
     render();
   }
 
@@ -380,6 +415,28 @@
     dom.btnHoaAuto.disabled = interlocked;
     dom.btnHoaOff.disabled = interlocked;
     dom.btnHoaHand.disabled = interlocked;
+
+    // Manual override buttons
+    dom.btnChlorine.disabled = interlocked || !!state.chlorineStartTime || state.chlorineComplete || treated || level <= 0;
+    dom.btnBoil.disabled = interlocked || !state.chlorineComplete || !!state.boilingStartTime || state.boilingComplete || treated;
+    dom.btnGate.disabled = interlocked || !treated;
+
+    dom.btnChlorine.classList.toggle('active', phase === 'CHLORINATING');
+    dom.btnBoil.classList.toggle('active', phase === 'BOILING');
+    dom.btnGate.classList.toggle('active', state.manualGate);
+
+    // Manual status text
+    if (interlocked) {
+      dom.manualStatus.textContent = 'Manual control: disabled during interlock';
+    } else if (phase === 'DISPENSING') {
+      dom.manualStatus.textContent = 'Dispensing treated water to storage...';
+    } else if (phase === 'CHLORINATING') {
+      dom.manualStatus.textContent = 'Chlorine pump active...';
+    } else if (phase === 'BOILING') {
+      dom.manualStatus.textContent = 'Boiling in progress...';
+    } else {
+      dom.manualStatus.textContent = 'Manual control: trigger treatment phases directly';
+    }
   }
 
   function setLed(el, on, cls) {
