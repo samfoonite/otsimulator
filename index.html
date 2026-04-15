@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SCADA Water Treatment Simulation</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>SCADA Water Treatment Plant &mdash; HMI Panel</h1>
+    <div id="clock"></div>
+  </header>
+
+  <main>
+    <!-- Left column: Tank visualisation -->
+    <section class="panel tank-panel">
+      <h2>Process Tank</h2>
+      <div class="tank-wrapper">
+        <div class="tank" id="tank">
+          <div class="water" id="water"></div>
+          <div class="tank-label" id="tank-label">0 %</div>
+        </div>
+        <div class="tank-marks">
+          <span>100 %</span>
+          <span>90 %</span>
+          <span>50 %</span>
+          <span>0 %</span>
+        </div>
+      </div>
+      <div class="controls">
+        <button id="btn-fill" class="btn btn-primary">Fill Tank</button>
+        <button id="btn-drain" class="btn btn-danger">Drain Tank</button>
+        <button id="btn-reset" class="btn btn-warning">Emergency Reset</button>
+      </div>
+    </section>
+
+    <!-- Centre column: Sensors & indicators -->
+    <section class="panel indicators-panel">
+      <h2>Sensors &amp; Indicators</h2>
+
+      <div class="indicator-group">
+        <div class="indicator">
+          <div class="led" id="led-level-low"></div>
+          <span>Level Low</span>
+        </div>
+        <div class="indicator">
+          <div class="led" id="led-level-high"></div>
+          <span>Level High (90 %)</span>
+        </div>
+        <div class="indicator">
+          <div class="led" id="led-chlorine"></div>
+          <span>Chlorine Pump</span>
+        </div>
+        <div class="indicator">
+          <div class="led" id="led-boiling"></div>
+          <span>Boiling</span>
+        </div>
+        <div class="indicator">
+          <div class="led" id="led-temp-critical"></div>
+          <span>Temp Critical (&ge; 500)</span>
+        </div>
+        <div class="indicator">
+          <div class="led" id="led-fan"></div>
+          <span>Cooling Fan</span>
+        </div>
+        <div class="indicator">
+          <div class="led" id="led-gate"></div>
+          <span>Gate Open</span>
+        </div>
+        <div class="indicator">
+          <div class="led" id="led-treated"></div>
+          <span>Water Treated</span>
+        </div>
+      </div>
+
+      <div class="readouts">
+        <div class="readout">
+          <span class="readout-label">Tank Level</span>
+          <span class="readout-value" id="val-level">0 %</span>
+        </div>
+        <div class="readout">
+          <span class="readout-label">Temperature</span>
+          <span class="readout-value" id="val-temp">0 &deg;C</span>
+        </div>
+        <div class="readout">
+          <span class="readout-label">Chlorine (30s)</span>
+          <span class="readout-value" id="val-chlorine-timer">--</span>
+        </div>
+        <div class="readout">
+          <span class="readout-label">Boiling (10s)</span>
+          <span class="readout-value" id="val-boiling-timer">--</span>
+        </div>
+        <div class="readout">
+          <span class="readout-label">Fan Mode</span>
+          <span class="readout-value" id="val-fan-mode">AUTO</span>
+        </div>
+        <div class="readout">
+          <span class="readout-label">Process State</span>
+          <span class="readout-value" id="val-state">IDLE</span>
+        </div>
+      </div>
+
+      <!-- Alarm banner -->
+      <div class="alarm-banner hidden" id="alarm-banner">
+        SAFETY INTERLOCK TRIGGERED &mdash; PROCESS KILLED
+      </div>
+    </section>
+
+    <!-- Right column: Actuators -->
+    <section class="panel actuator-panel">
+      <h2>Actuator Controls</h2>
+
+      <!-- Fan HOA -->
+      <fieldset class="control-group">
+        <legend>Cooling Fan (HOA)</legend>
+        <div class="fan-visual" id="fan-visual">
+          <div class="fan-blade" id="fan-blade"></div>
+        </div>
+        <div class="hoa-buttons">
+          <button class="btn hoa-btn" id="btn-hoa-auto" data-mode="auto">Auto</button>
+          <button class="btn hoa-btn" id="btn-hoa-off" data-mode="off">Off</button>
+          <button class="btn hoa-btn" id="btn-hoa-hand" data-mode="hand">Hand</button>
+        </div>
+        <p class="hoa-status" id="hoa-status">Mode: AUTO &mdash; Fan follows temperature</p>
+      </fieldset>
+
+      <!-- Gate -->
+      <fieldset class="control-group">
+        <legend>Treated Water Gate</legend>
+        <div class="gate-visual">
+          <div class="gate-frame">
+            <div class="gate-door" id="gate-door"></div>
+            <div class="gate-water-flow hidden" id="gate-water-flow"></div>
+          </div>
+          <span class="gate-label" id="gate-label">CLOSED</span>
+        </div>
+      </fieldset>
+
+      <!-- Treated water storage -->
+      <fieldset class="control-group">
+        <legend>Treated Water Storage</legend>
+        <div class="storage-tank" id="storage-tank">
+          <div class="storage-water" id="storage-water"></div>
+          <span class="storage-label" id="storage-label">0 %</span>
+        </div>
+      </fieldset>
+    </section>
+  </main>
+
+  <footer>
+    <p>SCADA Simulation &mdash; Educational Demo &mdash; All values are virtual</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
